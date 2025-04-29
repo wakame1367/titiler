@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from rasterio.io import MemoryFile
 from starlette.testclient import TestClient
 
-from titiler.xarray.extensions import VariablesExtension
+from titiler.xarray.extensions import DatasetMetadataExtension, VariablesExtension
 from titiler.xarray.factory import TilerFactory
 
 prefix = os.path.join(os.path.dirname(__file__), "fixtures")
@@ -19,16 +19,26 @@ dataset_4d_nc = os.path.join(prefix, "dataset_4d.nc")
 zarr_pyramid = os.path.join(prefix, "pyramid.zarr")
 
 
+def test_deprecated_extension():
+    """Test factory with options."""
+    """Test TilerFactory class."""
+    with pytest.warns(DeprecationWarning):
+        md = TilerFactory(extensions=[VariablesExtension()])
+    assert len(md.router.routes) == 20
+
+
 def test_tiler_factory():
     """Test factory with options."""
     """Test TilerFactory class."""
     md = TilerFactory(
-        add_viewer=False, add_part=False, extensions=[VariablesExtension()]
+        add_viewer=False,
+        add_part=False,
+        extensions=[DatasetMetadataExtension()],
     )
-    assert len(md.router.routes) == 14
+    assert len(md.router.routes) == 16
 
-    md = TilerFactory(router_prefix="/md", extensions=[VariablesExtension()])
-    assert len(md.router.routes) == 20
+    md = TilerFactory(router_prefix="/md", extensions=[DatasetMetadataExtension()])
+    assert len(md.router.routes) == 22
 
     app = FastAPI()
     app.include_router(md.router, prefix="/md")
@@ -44,8 +54,8 @@ def test_tiler_factory():
 @pytest.fixture
 def app():
     """App fixture."""
-    md = TilerFactory(router_prefix="/md", extensions=[VariablesExtension()])
-    assert len(md.router.routes) == 20
+    md = TilerFactory(router_prefix="/md", extensions=[DatasetMetadataExtension()])
+    assert len(md.router.routes) == 22
 
     app = FastAPI()
     app.include_router(md.router, prefix="/md")
@@ -57,12 +67,21 @@ def app():
     "filename",
     [dataset_2d_nc, dataset_3d_nc, dataset_3d_zarr],
 )
-def test_variable(filename, app):
-    """Test /variables endpoint."""
-    resp = app.get("/md/variables", params={"url": filename})
+def test_dataset_extension(filename, app):
+    """Test /dataset endpoints."""
+    resp = app.get("/md/dataset/keys", params={"url": filename})
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/json"
     assert resp.json() == ["dataset"]
+
+    resp = app.get("/md/dataset/dict", params={"url": filename})
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
+    assert resp.json()["data_vars"]["dataset"]
+
+    resp = app.get("/md/dataset/", params={"url": filename})
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers["content-type"]
 
 
 @pytest.mark.parametrize(
@@ -116,22 +135,55 @@ def test_info_da_options(app):
     """Test /info endpoints with Dataarray options."""
     resp = app.get(
         "/md/info",
-        params={"url": dataset_4d_nc, "variable": "dataset", "drop_dims": "z=0"},
+        params={"url": dataset_4d_nc, "variable": "dataset", "sel": "time=2023-01-01"},
     )
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/json"
+    body = resp.json()
+    assert body["band_descriptions"] == [["b1", "0"]]
+
+    resp = app.get(
+        "/md/info",
+        params={"url": dataset_4d_nc, "variable": "dataset", "sel": "z=0"},
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
+    body = resp.json()
+    assert body["band_descriptions"] == [
+        ["b1", "2022-01-01T00:00:00.000000000"],
+        ["b2", "2023-01-01T00:00:00.000000000"],
+    ]
+
+    resp = app.get(
+        "/md/info",
+        params={
+            "url": dataset_4d_nc,
+            "variable": "dataset",
+            "sel": "z=1",
+            "sel_method": "nearest",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
+    body = resp.json()
+    assert body["band_descriptions"] == [
+        ["b1", "2022-01-01T00:00:00.000000000"],
+        ["b2", "2023-01-01T00:00:00.000000000"],
+    ]
 
     resp = app.get(
         "/md/info",
         params={
             "url": dataset_3d_nc,
             "variable": "dataset",
-            "datetime": "2023-01-01",
+            "sel": "time=2023-01-01",
             "decode_times": True,
         },
     )
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/json"
+    body = resp.json()
+    assert body["band_descriptions"] == [["b1", "2023-01-01T00:00:00.000000000"]]
 
 
 @pytest.mark.parametrize(
@@ -146,21 +198,21 @@ def test_tiles(filename, app):
 
     resp = app.get(
         "/md/tiles/WebMercatorQuad/0/0/0",
-        params={"url": filename, "variable": "dataset", "rescale": "0,500"},
+        params={"url": filename, "variable": "dataset", "rescale": "0,500", "bidx": 1},
     )
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "image/png"
 
     resp = app.get(
         "/md/tiles/WebMercatorQuad/0/0/0.jpeg",
-        params={"url": filename, "variable": "dataset", "rescale": "0,500"},
+        params={"url": filename, "variable": "dataset", "rescale": "0,500", "bidx": 1},
     )
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "image/jpeg"
 
     resp = app.get(
         "/md/WebMercatorQuad/tilejson.json",
-        params={"url": filename, "variable": "dataset", "rescale": "0,500"},
+        params={"url": filename, "variable": "dataset", "rescale": "0,500", "bidx": 1},
     )
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/json"
@@ -265,7 +317,7 @@ def test_part(filename, app):
 
     resp = app.post(
         "/md/feature",
-        params={"url": filename, "variable": "dataset", "rescale": "0,500"},
+        params={"url": filename, "variable": "dataset", "rescale": "0,500", "bidx": 1},
         json=feat,
     )
     assert resp.status_code == 200
@@ -273,7 +325,7 @@ def test_part(filename, app):
 
     resp = app.post(
         "/md/feature.png",
-        params={"url": filename, "variable": "dataset", "rescale": "0,500"},
+        params={"url": filename, "variable": "dataset", "rescale": "0,500", "bidx": 1},
         json=feat,
     )
     assert resp.status_code == 200
@@ -281,7 +333,7 @@ def test_part(filename, app):
 
     resp = app.post(
         "/md/feature/100x100.png",
-        params={"url": filename, "variable": "dataset", "rescale": "0,500"},
+        params={"url": filename, "variable": "dataset", "rescale": "0,500", "bidx": 1},
         json=feat,
     )
     assert resp.status_code == 200
@@ -289,14 +341,14 @@ def test_part(filename, app):
 
     resp = app.get(
         "/md/bbox/-100,-25,40,60.jpeg",
-        params={"url": filename, "variable": "dataset", "rescale": "0,500"},
+        params={"url": filename, "variable": "dataset", "rescale": "0,500", "bidx": 1},
     )
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "image/jpeg"
 
     resp = app.get(
         "/md/bbox/-100,-25,40,60/100x100.png",
-        params={"url": filename, "variable": "dataset", "rescale": "0,500"},
+        params={"url": filename, "variable": "dataset", "rescale": "0,500", "bidx": 1},
     )
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "image/png"

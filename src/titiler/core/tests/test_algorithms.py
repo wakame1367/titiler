@@ -3,6 +3,7 @@
 import json
 
 import numpy
+import pytest
 from fastapi import Depends, FastAPI
 from rasterio.io import MemoryFile
 from rio_tiler.models import ImageData
@@ -236,6 +237,16 @@ def test_terrarium():
     assert out.array.dtype == "uint8"
     assert out.array[0, 0, 0] is numpy.ma.masked
 
+    # works on the above masked array img, with algo which was passed nodata_height
+    nodata_height = 10.0
+    algo = default_algorithms.get("terrarium")(nodata_height=nodata_height)
+    out = algo(img)
+    masked = out.array[:, arr.mask[0, :, :]]
+    masked_height = (masked[0] * 256 + masked[1] + masked[2] / 256) - 32768
+    numpy.testing.assert_array_equal(
+        masked_height, nodata_height * numpy.ones((100 * 100), dtype="bool")
+    )
+
 
 def test_terrainrgb():
     """test terrainrgb."""
@@ -258,6 +269,18 @@ def test_terrainrgb():
     assert out.array.shape == (3, 256, 256)
     assert out.array.dtype == "uint8"
     assert out.array[0, 0, 0] is numpy.ma.masked
+
+    # works on the above masked array img, with algo which was passed nodata_height
+    nodata_height = 10.0
+    algo = default_algorithms.get("terrainrgb")(nodata_height=nodata_height)
+    out = algo(img)
+    masked = out.array[:, arr.mask[0, :, :]]
+    masked_height = -10000 + (
+        ((masked[0] * 256 * 256) + (masked[1] * 256) + masked[2]) * 0.1
+    )
+    numpy.testing.assert_array_equal(
+        masked_height, nodata_height * numpy.ones((100 * 100), dtype="bool")
+    )
 
 
 def test_ops():
@@ -293,4 +316,36 @@ def test_ops():
     assert out.array.shape == (1, 256, 256)
     assert out.array.dtype == "uint8"
     assert out.array[0, 0, 0] == 2
+    assert out.array[0, 1, 1] is numpy.ma.masked
+
+
+@pytest.mark.parametrize(
+    "name,numpy_method,options",
+    [
+        ("min", numpy.ma.min, {}),
+        ("max", numpy.ma.max, {}),
+        ("median", numpy.ma.median, {}),
+        ("mean", numpy.ma.mean, {}),
+        ("std", numpy.ma.std, {"ddof": 1}),
+        ("var", numpy.ma.var, {"ddof": 1}),
+    ],
+)
+def test_math_algorithm(name, numpy_method, options):
+    """test math algos."""
+    arr = numpy.ma.MaskedArray(
+        numpy.random.randint(0, 5000, (1, 256, 256)).astype("float32"),
+        mask=numpy.zeros((1, 256, 256), dtype="bool"),
+    )
+    arr.data[0, 0, 0] = 1.6
+    arr.mask[0, 1:100, 1:100] = True
+
+    img = ImageData(arr)
+    assert img.array.dtype == numpy.float32
+
+    algo = default_algorithms.get(name)()
+    out = algo(img)
+
+    numpy.testing.assert_array_equal(
+        out.array, numpy_method(img.array, axis=0, keepdims=True, **options)
+    )
     assert out.array[0, 1, 1] is numpy.ma.masked

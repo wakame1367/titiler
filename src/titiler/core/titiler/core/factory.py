@@ -241,7 +241,7 @@ class TilerFactory(BaseFactory):
         templates (Jinja2Templates): Jinja2 templates.
         add_preview (bool): add `/preview` endpoints. Defaults to True.
         add_part (bool): add `/bbox` and `/feature` endpoints. Defaults to True.
-        add_viewer (bool): add `/map` endpoints. Defaults to True.
+        add_viewer (bool): add `/map.html` endpoints. Defaults to True.
 
     """
 
@@ -925,9 +925,9 @@ class TilerFactory(BaseFactory):
                     }
 
     def map_viewer(self):  # noqa: C901
-        """Register /map endpoint."""
+        """Register /map.html endpoint."""
 
-        @self.router.get("/{tileMatrixSetId}/map", response_class=HTMLResponse)
+        @self.router.get("/{tileMatrixSetId}/map.html", response_class=HTMLResponse)
         def map_viewer(
             request: Request,
             tileMatrixSetId: Annotated[
@@ -970,8 +970,11 @@ class TilerFactory(BaseFactory):
             tilejson_url = self.url_for(
                 request, "tilejson", tileMatrixSetId=tileMatrixSetId
             )
+            point_url = self.url_for(request, "point", lon="{lon}", lat="{lat}")
             if request.query_params._list:
-                tilejson_url += f"?{urlencode(request.query_params._list)}"
+                params = f"?{urlencode(request.query_params._list)}"
+                tilejson_url += params
+                point_url += params
 
             tms = self.supported_tms.get(tileMatrixSetId)
             return self.templates.TemplateResponse(
@@ -979,6 +982,7 @@ class TilerFactory(BaseFactory):
                 name="map.html",
                 context={
                     "tilejson_endpoint": tilejson_url,
+                    "point_endpoint": point_url,
                     "tms": tms,
                     "resolutions": [matrix.cellSize for matrix in tms],
                 },
@@ -1193,7 +1197,7 @@ class TilerFactory(BaseFactory):
                 with self.reader(src_path, **reader_params.as_dict()) as src_dst:
                     image = src_dst.preview(
                         **layer_params.as_dict(),
-                        **image_params.as_dict(),
+                        **image_params.as_dict(exclude_none=False),
                         **dataset_params.as_dict(),
                         dst_crs=dst_crs,
                     )
@@ -1457,7 +1461,7 @@ class MultiBaseTilerFactory(TilerFactory):
                 with self.reader(src_path, **reader_params.as_dict()) as src_dst:
                     return src_dst.statistics(
                         **asset_params.as_dict(),
-                        **image_params.as_dict(),
+                        **image_params.as_dict(exclude_none=False),
                         **dataset_params.as_dict(),
                         **stats_params.as_dict(),
                         hist_options=histogram_params.as_dict(),

@@ -55,7 +55,7 @@ Factory meant to create endpoints for single dataset using [*rio-tiler*'s `Reade
 - **render_func**: Image rendering method. Defaults to `titiler.core.utils.render_image`.
 - **add_preview**: . Add `/preview` endpoint to the router. Defaults to `True`.
 - **add_part**: . Add `/bbox` and `/feature` endpoints to the router. Defaults to `True`.
-- **add_viewer**: . Add `/map` endpoints to the router. Defaults to `True`.
+- **add_viewer**: . Add `/map.html` endpoints to the router. Defaults to `True`.
 
 #### Endpoints
 
@@ -88,7 +88,7 @@ app.include_router(cog.router)
 | `GET`  | `/tiles`                                                        | JSON                                        | List of OGC Tilesets available
 | `GET`  | `/tiles/{tileMatrixSetId}`                                      | JSON                                        | OGC Tileset metadata
 | `GET`  | `/tiles/{tileMatrixSetId}/{z}/{x}/{y}[@{scale}x][.{format}]`    | image/bin                                   | create a web map tile image from a dataset
-| `GET`  | `/{tileMatrixSetId}/map`                                        | HTML                                        | return a simple map viewer **Optional**
+| `GET`  | `/{tileMatrixSetId}/map.html`                                   | HTML                                        | return a simple map viewer **Optional**
 | `GET`  | `/{tileMatrixSetId}/tilejson.json`                              | JSON ([TileJSON][tilejson_model])           | return a Mapbox TileJSON document
 | `GET`  | `/{tileMatrixSetId}/WMTSCapabilities.xml`                       | XML                                         | return OGC WMTS Get Capabilities
 | `GET`  | `/point/{lon},{lat}`                                            | JSON ([Point][point_model])                 | return pixel values from a dataset
@@ -135,7 +135,7 @@ app.include_router(stac.router)
 | `GET`  | `/tiles`                                                        | JSON                                             | List of OGC Tilesets available
 | `GET`  | `/tiles/{tileMatrixSetId}`                                      | JSON                                             | OGC Tileset metadata
 | `GET`  | `/tiles/{tileMatrixSetId}/{z}/{x}/{y}[@{scale}x][.{format}]`    | image/bin                                        | create a web map tile image from assets
-| `GET`  | `/{tileMatrixSetId}/map`                                        | HTML                                             | return a simple map viewer **Optional**
+| `GET`  | `/{tileMatrixSetId}/map.html`                                   | HTML                                             | return a simple map viewer **Optional**
 | `GET`  | `/{tileMatrixSetId}/tilejson.json`                              | JSON ([TileJSON][tilejson_model])                | return a Mapbox TileJSON document
 | `GET`  | `/{tileMatrixSetId}/WMTSCapabilities.xml`                       | XML                                              | return OGC WMTS Get Capabilities
 | `GET`  | `/point/{lon},{lat}`                                            | JSON ([Point][multipoint_model])                 | return pixel values from assets
@@ -191,7 +191,7 @@ app.include_router(landsat.router)
 | `GET`  | `/tiles`                                                        | JSON                                         | List of OGC Tilesets available
 | `GET`  | `/tiles/{tileMatrixSetId}`                                      | JSON                                         | OGC Tileset metadata
 | `GET`  | `/tiles/{tileMatrixSetId}/{z}/{x}/{y}[@{scale}x][.{format}]`    | image/bin                                    | create a web map tile image from a dataset
-| `GET`  | `/{tileMatrixSetId}/map`                                        | HTML                                         | return a simple map viewer **Optional**
+| `GET`  | `/{tileMatrixSetId}/map.html`                                   | HTML                                         | return a simple map viewer **Optional**
 | `GET`  | `/{tileMatrixSetId}/tilejson.json`                              | JSON ([TileJSON][tilejson_model])            | return a Mapbox TileJSON document
 | `GET`  | `/{tileMatrixSetId}/WMTSCapabilities.xml`                       | XML                                          | return OGC WMTS Get Capabilities
 | `GET`  | `/point/{lon},{lat}`                                            | JSON ([Point][point_model])                  | return pixel value from a dataset
@@ -311,7 +311,7 @@ Endpoints factory for mosaics, built on top of [MosaicJSON](https://github.com/d
 - **supported_tms**: List of available TileMatrixSets. Defaults to `morecantile.tms`.
 - **templates**: *Jinja2* templates to use in endpoints. Defaults to `titiler.core.factory.DEFAULT_TEMPLATES`.
 - **optional_headers**: List of OptionalHeader which endpoints could add (if implemented). Defaults to `[]`.
-- **add_viewer**: . Add `/map` endpoints to the router. Defaults to `True`.
+- **add_viewer**: . Add `/map.html` endpoints to the router. Defaults to `True`.
 
 #### Endpoints
 
@@ -324,7 +324,7 @@ Endpoints factory for mosaics, built on top of [MosaicJSON](https://github.com/d
 | `GET`  | `/tiles`                                                        | JSON                                               | List of OGC Tilesets available
 | `GET`  | `/tiles/{tileMatrixSetId}`                                      | JSON                                               | OGC Tileset metadata
 | `GET`  | `/tiles/{tileMatrixSetId}/{z}/{x}/{y}[@{scale}x][.{format}]`    | image/bin                                          | create a web map tile image from a MosaicJSON
-| `GET`  | `/{tileMatrixSetId}/map`                                        | HTML                                               | return a simple map viewer **Optional**
+| `GET`  | `/{tileMatrixSetId}/map.html`                                   | HTML                                               | return a simple map viewer **Optional**
 | `GET`  | `/{tileMatrixSetId}/tilejson.json`                              | JSON ([TileJSON][tilejson_model])                  | return a Mapbox TileJSON document
 | `GET`  | `/{tileMatrixSetId}/WMTSCapabilities.xml`                       | XML                                                | return OGC WMTS Get Capabilities
 | `GET`  | `/point/{lon},{lat}`                                            | JSON ([Point][mosaic_point])                       | return pixel value from a MosaicJSON dataset
@@ -343,7 +343,7 @@ class: `titiler.xarray.factory.TilerFactory`
 - **reader**: Dataset Reader **required**.
 - **path_dependency**: Dependency to use to define the dataset url. Defaults to `titiler.core.dependencies.DatasetPathParams`.
 - **reader_dependency**: Dependency to control options passed to the reader instance init. Defaults to `titiler.xarray.dependencies.XarrayParams`
-- **layer_dependency**: Dependency to define band indexes or expression. Defaults to `titiler.core.dependencies.DefaultDependency`.
+- **layer_dependency**: Dependency to define band indexes or expression. Defaults to `titiler.core.dependencies.BidxParams`.
 - **dataset_dependency**: Dependency to overwrite `nodata` value and change the `Warp` resamplings. Defaults to `titiler.xarray.dependencies.DatasetParams`.
 - **tile_dependency**: Dependency for tile creation options. Defaults to `titiler.core.dependencies.DefaultDependency`.
 - **stats_dependency**: Dependency to define options for *rio-tiler*'s statistics method used in `/statistics` endpoints. Defaults to `titiler.core.dependencies.StatisticsParams`.
@@ -356,7 +356,7 @@ class: `titiler.xarray.factory.TilerFactory`
 - **supported_tms**: List of available TileMatrixSets. Defaults to `morecantile.tms`.
 - **templates**: *Jinja2* templates to use in endpoints. Defaults to `titiler.core.factory.DEFAULT_TEMPLATES`.
 - **add_part**: . Add `/bbox` and `/feature` endpoints to the router. Defaults to `True`.
-- **add_viewer**: . Add `/map` endpoints to the router. Defaults to `True`.
+- **add_viewer**: . Add `/map.html` endpoints to the router. Defaults to `True`.
 
 
 ```python
@@ -388,7 +388,7 @@ app.include_router(md.router)
 | `GET`  | `/tiles`                                                        | JSON                                        | List of OGC Tilesets available
 | `GET`  | `/tiles/{tileMatrixSetId}`                                      | JSON                                        | OGC Tileset metadata
 | `GET`  | `/tiles/{tileMatrixSetId}/{z}/{x}/{y}[@{scale}x][.{format}]`    | image/bin                                   | create a web map tile image from a dataset
-| `GET`  | `/{tileMatrixSetId}/map`                                        | HTML                                        | return a simple map viewer **Optional**
+| `GET`  | `/{tileMatrixSetId}/map.html`                                   | HTML                                        | return a simple map viewer **Optional**
 | `GET`  | `/{tileMatrixSetId}/tilejson.json`                              | JSON ([TileJSON][tilejson_model])           | return a Mapbox TileJSON document
 | `GET`  | `/{tileMatrixSetId}/WMTSCapabilities.xml`                       | XML                                         | return OGC WMTS Get Capabilities
 | `GET`  | `/point/{lon},{lat}`                                            | JSON ([Point][point_model])                 | return pixel values from a dataset

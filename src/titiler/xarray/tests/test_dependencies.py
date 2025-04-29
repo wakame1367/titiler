@@ -1,8 +1,9 @@
 """test dependencies."""
 
+from typing import Annotated
+
 from fastapi import Depends, FastAPI, Path
 from starlette.testclient import TestClient
-from typing_extensions import Annotated
 
 from titiler.xarray import dependencies
 
@@ -44,3 +45,32 @@ def test_xarray_tile():
         response = client.get("/tiles/1/2/3", params={"variable": "yo"})
         params = response.json()
         assert params == {"variable": "yo"}
+
+        response = client.get("/tiles/1/2/3", params={"sel": "yo=yo"})
+        params = response.json()
+        assert params == {"sel": ["yo=yo"]}
+
+        response = client.get("/tiles/1/2/3", params={"sel": "yo=1.0"})
+        params = response.json()
+        assert params == {"sel": ["yo=1.0"]}
+
+        response = client.get("/tiles/1/2/3", params={"sel": ["yo=yo", "ye=ye"]})
+        params = response.json()
+        assert params == {"sel": ["yo=yo", "ye=ye"]}
+
+        response = client.get("/tiles/1/2/3?sel=yo=yo&sel=ye=ye")
+        params = response.json()
+        assert params == {"sel": ["yo=yo", "ye=ye"]}
+
+        response = client.get("/tiles/1/2/3", params={"sel": "yo"})
+        assert response.status_code == 422
+
+        response = client.get("/tiles/1/2/3", params={"sel": "=yo"})
+        assert response.status_code == 422
+
+        response = client.get("/tiles/1/2/3", params={"sel": "yo="})
+        assert response.status_code == 422
+
+        response = client.get("/tiles/1/2/3", params={"sel_method": "nearest"})
+        params = response.json()
+        assert params == {"method": "nearest"}
